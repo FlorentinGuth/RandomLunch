@@ -58,9 +58,21 @@ empty_history = {}
 
 # Enumeration of configurations.
 
+
+def argmax(iterable, score):
+    """ Finds the first item in iterable with the highest score. """
+    best_item = None
+    best_score = float("-inf")
+    for item in iterable:
+        if (item_score := score(item)) > best_score:
+            best_item = item
+            best_score = item_score
+    return best_item
+
+
 def get_group_sizes(num_participants):
     """ Break the number of participants into group sizes.
-    We try to make groups that are of size ideal_group_size or ideal_group_size - 1.
+    We try to make groups that are of size ideal_group_size or ideal_group_size +/- 1.
     :return: a dictionary whose keys are group sizes and whose values are the number of such groups.
     """
     # Start with k groups of size group_size and a smaller rest.
@@ -75,19 +87,25 @@ def get_group_sizes(num_participants):
     elif rest == 0:
         groups = {ideal_group_size: num_full_groups}
 
-    # Otherwise, we try to make groups of size ideal_group_size - 1.
-    # This is possible if there are enough full groups: we move some participants from them to this last group.
-    elif num_full_groups >= (num_participants_to_move := ideal_group_size - 1 - rest):
-        groups = {ideal_group_size: num_full_groups - num_participants_to_move,
-                  ideal_group_size - 1: num_participants_to_move + 1}
-
-    # If this is not possible, we make larger groups.
-    # We then move participants from the rest group to the full groups.
+    # Otherwise, we try to make groups of size ideal_group_size - 1 or ideal_group_size + 1, if possible.
+    # This is done by moving participants from full groups to the rest groups, or by moving participants from the rest
+    # group to full groups.
     else:
+        # With ideal_group_size - 1: may be impossible if there are not enough full_groups.
+        num_participants_to_move = ideal_group_size - 1 - rest
+        small_groups = {ideal_group_size: num_full_groups - num_participants_to_move,
+                        ideal_group_size - 1: num_participants_to_move + 1}
+
+        # With larger groups: always possible.
         additional_participants_per_group = rest // num_full_groups  # Should be zero most of the time.
         rest_rest = rest % num_full_groups
-        groups = {ideal_group_size + additional_participants_per_group: num_full_groups - rest_rest,
-                  ideal_group_size + additional_participants_per_group + 1: rest_rest}
+        big_groups = {ideal_group_size + additional_participants_per_group: num_full_groups - rest_rest,
+                      ideal_group_size + additional_participants_per_group + 1: rest_rest}
+
+        # Filter impossible configurations and select the one with the most groups of ideal size.
+        configurations = [groups for groups in [small_groups, big_groups]
+                          if all(num_groups >= 0 for num_groups in groups.values())]
+        groups = argmax(configurations, lambda groups: groups.get(ideal_group_size, 0))
 
     # Filter zeroes.
     return {group_size: num_groups for group_size, num_groups in groups.items() if num_groups > 0}
