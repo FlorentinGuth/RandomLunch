@@ -20,6 +20,7 @@ import tqdm
 from typing import NamedTuple
 import pandas as pd
 import scipy.special
+import numpy as np
 
 
 email_field = "Your email "
@@ -205,6 +206,19 @@ def enumerate_configurations(num_participants, group_sizes):
                                        for group in configuration]
 
 
+def enumerate_random_configurations(num_participants, group_sizes):
+    """ Infinite enumerator over random configurations, which might be better suited to our problem size. """
+    while True:
+        random_order = np.random.permutation(num_participants)
+        configuration = []
+        i = 0
+        for group_size, num_groups in group_sizes.items():
+            for _ in range(num_groups):
+                configuration.append(random_order[i:i + group_size])
+                i += group_size
+        yield configuration
+
+
 def num_configurations(num_participants, group_sizes):
     """ Compute the number of configurations for a given partition into groups. """
     num = 1
@@ -236,7 +250,7 @@ def get_random_minimal_cost_configuration(participants, group_sizes, history):
     best_cost = float("inf")
     best_configurations = []
     try:
-        iterator = tqdm.tqdm(enumerate_configurations(num_participants, group_sizes),
+        iterator = tqdm.tqdm(enumerate_random_configurations(num_participants, group_sizes),
                              total=num_configurations(num_participants, group_sizes))
         for configuration in iterator:
             # Translate participants from numbers to email addresses.
@@ -297,6 +311,9 @@ def parse_configuration(configuration_file, participants):
                 continue
             else:
                 group.append(participants.index[participants[name_field] == line][0])
+        # Let's not forget the last group.
+        if len(group) > 0:
+            configuration.append(group)
     return configuration
 
 
@@ -356,6 +373,7 @@ if __name__ == "__main__":
                         help="date of the random lunch, in YYYY-MM-DD format (default: next/previous Tuesday)")
     parser.add_argument("--participants", type=str, default="Formulaire sans titre.csv",
                         help="CSV file with the participants data")
+    parser.add_argument("--groups", type=int, default=None, nargs="+", help="custom repartition in groups")
     parser.add_argument("--cost", type=float, help="cost of the random lunch (only if record mode)")
     parser.add_argument("--payer-team", type=str, help="team which paid the random lunch (only if record mode)")
     args = parser.parse_args()
@@ -371,4 +389,9 @@ if __name__ == "__main__":
             today = datetime.date.today()
             days = (random_lunch_day - today.weekday()) % 7
             args.date = (today + datetime.timedelta(days=days)).strftime("%Y-%m-%d")
-        propose_random_lunch(args.date, args.participants, group_sizes=None)
+        if args.groups is not None:
+            group_sizes = {}
+            for group in args.groups:
+                group_sizes[group] = group_sizes.get(group, 0) + 1
+            args.groups = group_sizes
+        propose_random_lunch(args.date, args.participants, group_sizes=args.groups)
