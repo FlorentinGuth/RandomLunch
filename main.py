@@ -273,6 +273,12 @@ def get_random_minimal_cost_configuration(participants, group_sizes, history):
 def get_participants(participants_file):
     """ Returns the list of today's participants, as a DataFrame in random order. """
     df = pd.read_csv(participants_file)
+
+    # Convert email addresses for known aliases:
+    with open("aliases", "r") as f:
+        aliases = json.load(f)  # Dict from known aliases to default email address.
+    df[email_field] = df[email_field].map(lambda email: aliases[email] if email in aliases else email)
+
     df = df.sample(frac=1).reset_index(drop=True)  # Shuffle the DataFrame.
     return df
 
