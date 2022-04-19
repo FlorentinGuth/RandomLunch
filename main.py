@@ -25,6 +25,7 @@ import numpy as np
 
 email_field = "Your email "
 name_field = "Your first name and last name"
+status_field = "Your status"
 team_field = "Your team supervisor"
 
 random_lunch_day = 1  # Tuesday
@@ -363,12 +364,23 @@ def propose_random_lunch(random_lunch_date, participants_file, group_sizes=None)
 def record_random_lunch(random_lunch_date, cost, payer_team):
     """ Record the past random lunch in the history. """
     participants = get_participants(f"random_lunches/{random_lunch_date}-participants")
-    configuration = parse_configuration(f"random_lunches/{random_lunch_date}-config", participants)
-    history = get_history()
 
-    update_history(configuration, participants, cost, payer_team, history)
+    if cost is None or payer_team is None:
+        # Insufficient information to record random lunch, generate list of participants instead.
+        num_participants = len(participants)
 
-    save_history(random_lunch_date, history)
+        def print_field(i, field):
+            return f"{participants.iloc[i][field]:{max(len(s) for s in participants[field])}}"
+
+        for i in range(num_participants):
+            print(f"{i + 1:{len(str(num_participants))}}   {print_field(i, name_field)} {print_field(i, status_field)}   {print_field(i, team_field)}")
+    else:
+        configuration = parse_configuration(f"random_lunches/{random_lunch_date}-config", participants)
+        history = get_history()
+
+        update_history(configuration, participants, cost, payer_team, history)
+
+        save_history(random_lunch_date, history)
 
 
 if __name__ == "__main__":
@@ -377,7 +389,7 @@ if __name__ == "__main__":
                         help="record a past random lunch (propose a new one otherwise)")
     parser.add_argument("--date", type=str,
                         help="date of the random lunch, in YYYY-MM-DD format (default: next/previous Tuesday)")
-    parser.add_argument("--participants", type=str, default="Formulaire sans titre.csv",
+    parser.add_argument("--participants", type=str, default="Random Lunch.csv",
                         help="CSV file with the participants data")
     parser.add_argument("--groups", type=int, default=None, nargs="+", help="custom repartition in groups")
     parser.add_argument("--cost", type=float, help="cost of the random lunch (only if record mode)")
